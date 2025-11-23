@@ -8,6 +8,9 @@ import categoryService, { Category } from '../../api/categoryService';
 export const ProductManagement: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,17 +28,24 @@ export const ProductManagement: React.FC = () => {
     description: ''
   });
 
-  // Fetch products and categories on mount and when page changes
+  // Fetch products and categories on mount and when page changes or filters change
   useEffect(() => {
     fetchProducts();
     fetchCategories();
-  }, [currentPage]);
+  }, [currentPage, selectedCategory, minPrice, maxPrice]);
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
       setError('');
-      const response = await productService.getAll(currentPage, itemsPerPage);
+
+      const filters: any = {};
+      if (selectedCategory) filters.categoryId = selectedCategory;
+      if (minPrice) filters.minPrice = Number(minPrice);
+      if (maxPrice) filters.maxPrice = Number(maxPrice);
+      if (searchTerm) filters.search = searchTerm;
+
+      const response = await productService.getAll(currentPage, itemsPerPage, filters);
 
       if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
         setProducts(response.data);
@@ -150,6 +160,14 @@ export const ProductManagement: React.FC = () => {
     setNewProduct({ name: '', price: '', categoryId: '', stockQuantity: '', description: '' });
   };
 
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('');
+    setMinPrice('');
+    setMaxPrice('');
+    setCurrentPage(1);
+  };
+
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.category?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -172,15 +190,97 @@ export const ProductManagement: React.FC = () => {
       )}
 
       <Card className="overflow-hidden">
-        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-4">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+        <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+          <div className="flex flex-col gap-4">
+            {/* Search Bar */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500"
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3">
+              {/* Category Filter */}
+              <select
+                className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500 bg-white"
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="">All Categories</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+
+              {/* Min Price Filter */}
+              <input
+                type="number"
+                className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500 w-32"
+                placeholder="Min Price"
+                value={minPrice}
+                onChange={(e) => {
+                  setMinPrice(e.target.value);
+                  setCurrentPage(1);
+                }}
+                min="0"
+                step="0.01"
+              />
+
+              {/* Max Price Filter */}
+              <input
+                type="number"
+                className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500 w-32"
+                placeholder="Max Price"
+                value={maxPrice}
+                onChange={(e) => {
+                  setMaxPrice(e.target.value);
+                  setCurrentPage(1);
+                }}
+                min="0"
+                step="0.01"
+              />
+
+              {/* Clear Filters Button */}
+              {(selectedCategory || minPrice || maxPrice || searchTerm) && (
+                <button
+                  onClick={handleClearFilters}
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+
+            {/* Active Filters Display */}
+            {(selectedCategory || minPrice || maxPrice) && (
+              <div className="flex flex-wrap gap-2 text-xs">
+                {selectedCategory && (
+                  <span className="px-2 py-1 bg-brand-100 text-brand-700 rounded">
+                    Category: {categories.find(c => c.id === selectedCategory)?.name}
+                  </span>
+                )}
+                {minPrice && (
+                  <span className="px-2 py-1 bg-brand-100 text-brand-700 rounded">
+                    Min: ${minPrice}
+                  </span>
+                )}
+                {maxPrice && (
+                  <span className="px-2 py-1 bg-brand-100 text-brand-700 rounded">
+                    Max: ${maxPrice}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <table className="w-full text-left text-sm text-gray-600">

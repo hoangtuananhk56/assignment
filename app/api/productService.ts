@@ -45,10 +45,34 @@ const productService = {
         }
     },
 
-    // READ - Get all products
-    getAll: async (page: number = 1, limit: number = 10): Promise<Product[]> => {
+    // READ - Get all products with filters
+    getAll: async (
+        page: number = 1,
+        limit: number = 10,
+        filters?: {
+            categoryId?: string;
+            minPrice?: number;
+            maxPrice?: number;
+            search?: string;
+        }
+    ): Promise<Product[]> => {
         try {
-            const response = await api.get<Product[]>(`/products?page=${page}&limit=${limit}`);
+            let url = `/products?page=${page}&limit=${limit}`;
+
+            if (filters?.categoryId) {
+                url += `&categoryId=${filters.categoryId}`;
+            }
+            if (filters?.minPrice !== undefined) {
+                url += `&minPrice=${filters.minPrice}`;
+            }
+            if (filters?.maxPrice !== undefined) {
+                url += `&maxPrice=${filters.maxPrice}`;
+            }
+            if (filters?.search) {
+                url += `&search=${encodeURIComponent(filters.search)}`;
+            }
+
+            const response = await api.get<Product[]>(url);
             return response;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to fetch products');
