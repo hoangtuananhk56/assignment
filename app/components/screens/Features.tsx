@@ -765,8 +765,46 @@ export const Cart = ({ items, onCheckout, onStartShopping }: { items: CartItem[]
 };
 
 // --- ORDERS ---
-export const Orders = ({ orders }: { orders: Order[] }) => {
+export const Orders = () => {
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [orders, setOrders] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalOrders, setTotalOrders] = useState(0);
+    const itemsPerPage = 10;
+
+    useEffect(() => {
+        fetchOrders();
+    }, [currentPage]);
+
+    const fetchOrders = async () => {
+        try {
+            setLoading(true);
+            setError('');
+            const response = await orderService.getMyOrders(currentPage, itemsPerPage);
+
+            if (response && typeof response === 'object' && 'data' in response && Array.isArray((response as any).data)) {
+                setOrders((response as any).data);
+                const pagination = (response as any).pagination;
+                if (pagination) {
+                    setTotalPages(pagination.totalPages || 1);
+                    setTotalOrders(pagination.total || 0);
+                }
+            } else if (Array.isArray(response)) {
+                setOrders(response);
+            } else {
+                setOrders([]);
+            }
+        } catch (err: any) {
+            console.error('Error fetching orders:', err);
+            setError(err.message || 'Failed to load orders');
+            setOrders([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -778,6 +816,11 @@ export const Orders = ({ orders }: { orders: Order[] }) => {
             </div>
 
             <Card className="overflow-hidden">
+                {error && (
+                    <div className="p-4 bg-red-50 border-b border-red-200 text-red-600 text-sm">
+                        {error}
+                    </div>
+                )}
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm text-gray-600">
                         <thead className="bg-gray-50 text-gray-900 font-semibold border-b border-gray-200">
@@ -791,51 +834,68 @@ export const Orders = ({ orders }: { orders: Order[] }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {orders.map(order => (
-                                <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
-                                    <td className="px-6 py-4 font-mono font-medium text-gray-900">#{order.id}</td>
-                                    <td className="px-6 py-4">{order.date}</td>
-                                    <td className="px-6 py-4">
-                                        <Badge variant={
-                                            order.status === 'Delivered' ? 'success' :
-                                                order.status === 'Processing' ? 'warning' :
-                                                    'neutral'
-                                        }>
-                                            {order.status}
-                                        </Badge>
-                                    </td>
-                                    <td className="px-6 py-4">{order.items.length} Items</td>
-                                    <td className="px-6 py-4 font-medium">${order.total.toFixed(2)}</td>
-                                    <td className="px-6 py-4 text-right">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="text-brand-600 hover:bg-brand-50"
-                                            onClick={() => setSelectedOrder(order)}
-                                            icon={ExternalLink}
-                                        >
-                                            Details
-                                        </Button>
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                                        Loading orders...
                                     </td>
                                 </tr>
-                            ))}
-                            {orders.length === 0 && (
+                            ) : orders.length === 0 ? (
                                 <tr>
                                     <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                                         No orders found. Start shopping to see your history here.
                                     </td>
                                 </tr>
+                            ) : (
+                                orders.map(order => (
+                                    <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
+                                        <td className="px-6 py-4 font-mono font-medium text-gray-900">#{order.id.slice(0, 8)}</td>
+                                        <td className="px-6 py-4">{new Date(order.createdAt).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4">
+                                            <Badge variant={
+                                                order.status === 'DELIVERED' ? 'success' :
+                                                    order.status === 'PROCESSING' || order.status === 'PENDING' ? 'warning' :
+                                                        order.status === 'CANCELLED' ? 'error' :
+                                                            'neutral'
+                                            }>
+                                                {order.status}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-6 py-4">{order.orderItems?.length || 0} Items</td>
+                                        <td className="px-6 py-4 font-medium">${order.totalPrice?.toFixed(2) || '0.00'}</td>
+                                        <td className="px-6 py-4 text-right">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-brand-600 hover:bg-brand-50"
+                                                onClick={() => setSelectedOrder(order)}
+                                                icon={ExternalLink}
+                                            >
+                                                Details
+                                            </Button>
+                                        </td>
+                                    </tr>
+                                ))
                             )}
                         </tbody>
                     </table>
                 </div>
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={totalOrders}
+                    itemsPerPage={itemsPerPage}
+                    currentItemsCount={orders.length}
+                    onPageChange={setCurrentPage}
+                    isLoading={loading}
+                />
             </Card>
 
             {/* Order Details Modal */}
             <Modal
                 isOpen={!!selectedOrder}
                 onClose={() => setSelectedOrder(null)}
-                title={`Order Details #${selectedOrder?.id}`}
+                title={`Order Details #${selectedOrder?.id.slice(0, 8)}`}
             >
                 {selectedOrder && (
                     <div className="space-y-6">
@@ -846,20 +906,20 @@ export const Orders = ({ orders }: { orders: Order[] }) => {
                             </div>
                             <div className="text-right">
                                 <p className="text-sm text-gray-500">Order Date</p>
-                                <p className="font-semibold text-gray-900">{selectedOrder.date}</p>
+                                <p className="font-semibold text-gray-900">{new Date(selectedOrder.createdAt).toLocaleDateString()}</p>
                             </div>
                         </div>
 
                         <div>
                             <h4 className="font-semibold text-gray-900 mb-3">Items</h4>
                             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
-                                {selectedOrder.items.map((item, idx) => (
-                                    <div key={idx} className="flex items-center gap-3 p-2 border border-gray-100 rounded-lg">
-                                        <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-                                            <img src={item.image} alt="" className="w-full h-full object-cover" />
+                                {selectedOrder.orderItems?.map((item: any) => (
+                                    <div key={item.id} className="flex items-center gap-3 p-2 border border-gray-100 rounded-lg">
+                                        <div className="w-12 h-12 bg-brand-100 rounded flex-shrink-0 flex items-center justify-center">
+                                            <Package className="w-6 h-6 text-brand-600" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                                            <p className="text-sm font-medium text-gray-900 truncate">{item.product?.name || 'Product'}</p>
                                             <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                                         </div>
                                         <p className="text-sm font-medium text-gray-900">${(item.price * item.quantity).toFixed(2)}</p>
@@ -870,7 +930,7 @@ export const Orders = ({ orders }: { orders: Order[] }) => {
 
                         <div className="border-t border-gray-100 pt-4 flex justify-between items-center">
                             <p className="font-bold text-gray-900">Total Amount</p>
-                            <p className="font-bold text-2xl text-brand-600">${selectedOrder.total.toFixed(2)}</p>
+                            <p className="font-bold text-2xl text-brand-600">${selectedOrder.totalPrice?.toFixed(2) || '0.00'}</p>
                         </div>
 
                         <Button className="w-full" variant="outline" onClick={() => setSelectedOrder(null)}>

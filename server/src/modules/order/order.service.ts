@@ -53,8 +53,31 @@ export class OrderService {
       });
     }
 
-    // Create order, deduct stock, and clear cart in transaction
+    // Create order, deduct stock, and clear cart in transaction with row-level locking
     const order = await this.prisma.$transaction(async (tx) => {
+      // Lock product rows and re-check stock availability
+      for (const item of cart.items) {
+        const product = await tx.$queryRaw<Array<{ stockQuantity: number }>>` 
+          SELECT "stockQuantity" 
+          FROM "Product" 
+          WHERE "id" = ${item.productId} 
+          FOR UPDATE
+        `;
+
+        if (!product || product.length === 0) {
+          throw new BadRequestException(
+            `Product ${item.product.name} no longer exists`,
+          );
+        }
+
+        const currentStock = product[0].stockQuantity;
+        if (currentStock < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for product ${item.product.name}. Available: ${currentStock}, Requested: ${item.quantity}`,
+          );
+        }
+      }
+
       const newOrder = await tx.order.create({
         data: {
           userId,
@@ -78,16 +101,20 @@ export class OrderService {
         },
       });
 
-      // Update product stock
+      // Update product stock with atomic decrement
       for (const item of cart.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stockQuantity: {
-              decrement: item.quantity,
-            },
-          },
-        });
+        const result = await tx.$executeRaw`
+          UPDATE "Product"
+          SET "stockQuantity" = "stockQuantity" - ${item.quantity}
+          WHERE "id" = ${item.productId}
+          AND "stockQuantity" >= ${item.quantity}
+        `;
+
+        if (result === 0) {
+          throw new BadRequestException(
+            `Failed to update stock for ${item.product.name}. Stock may have been purchased by another user.`,
+          );
+        }
       }
 
       // Clear cart
@@ -137,8 +164,31 @@ export class OrderService {
       });
     }
 
-    // Create order and deduct stock in transaction
+    // Create order and deduct stock in transaction with row-level locking
     const order = await this.prisma.$transaction(async (tx) => {
+      // Lock product rows and re-check stock availability
+      for (const item of createOrderDto.items) {
+        const product = await tx.$queryRaw<Array<{ id: string; name: string; stockQuantity: number; price: number }>>` 
+          SELECT "id", "name", "stockQuantity", "price" 
+          FROM "Product" 
+          WHERE "id" = ${item.productId} 
+          FOR UPDATE
+        `;
+
+        if (!product || product.length === 0) {
+          throw new BadRequestException(
+            `Product with ID ${item.productId} not found`,
+          );
+        }
+
+        const currentStock = product[0].stockQuantity;
+        if (currentStock < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for product ${product[0].name}. Available: ${currentStock}, Requested: ${item.quantity}`,
+          );
+        }
+      }
+
       const newOrder = await tx.order.create({
         data: {
           userId,
@@ -162,16 +212,25 @@ export class OrderService {
         },
       });
 
-      // Update product stock
+      // Update product stock with atomic decrement
       for (const item of createOrderDto.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stockQuantity: {
-              decrement: item.quantity,
-            },
-          },
-        });
+        const result = await tx.$executeRaw`
+          UPDATE "Product"
+          SET "stockQuantity" = "stockQuantity" - ${item.quantity}
+          WHERE "id" = ${item.productId}
+          AND "stockQuantity" >= ${item.quantity}
+        `;
+
+        if (result === 0) {
+          // Get product name for better error message
+          const product = await tx.product.findUnique({
+            where: { id: item.productId },
+            select: { name: true },
+          });
+          throw new BadRequestException(
+            `Failed to update stock for ${product?.name || 'product'}. Stock may have been purchased by another user.`,
+          );
+        }
       }
 
       return newOrder;

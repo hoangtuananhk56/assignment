@@ -132,7 +132,7 @@ const App: React.FC = () => {
             onStartShopping={() => setCurrentView('SHOP')}
           />
         );
-      case 'ORDERS': return <Orders orders={orders} />;
+      case 'ORDERS': return <Orders />;
       default: return <UserManagement />;
     }
   };
