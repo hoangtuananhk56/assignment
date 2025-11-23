@@ -18,6 +18,9 @@ async function bootstrap() {
   // Enable CORS
   app.enableCors();
 
+  // Set global prefix
+  app.setGlobalPrefix('api/v1');
+
   // Swagger Configuration
   const config = new DocumentBuilder()
     .setTitle('Assignment API')
@@ -36,11 +39,12 @@ async function bootstrap() {
     )
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api/v1/docs', app, document);
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
-  console.log(`Swagger documentation available at: http://localhost:${port}/api`);
+  console.log(`API prefix: /api/v1`);
+  console.log(`Swagger documentation available at: http://localhost:${port}/api/v1/docs`);
 }
 bootstrap();

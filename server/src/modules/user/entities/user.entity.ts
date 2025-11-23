@@ -3,6 +3,7 @@ export class UserEntity {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
+  roleName?: string | null;
   roleId: string;
   role?: {
     id: string;

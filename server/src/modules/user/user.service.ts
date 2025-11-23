@@ -22,15 +22,13 @@ export class UserService {
 
     // If no roleId provided, assign customer role
     let roleId = createUserDto.roleId;
-    if (!roleId) {
-      const customerRole = await this.prisma.role.findUnique({
-        where: { name: 'customer' },
-      });
-      if (!customerRole) {
-        throw new NotFoundException('Customer role not found. Please run seed script.');
-      }
-      roleId = customerRole.id;
+    const customerRole = await this.prisma.role.findUnique({
+      where: { name: createUserDto.roleName || 'customer' },
+    });
+    if (!customerRole) {
+      throw new NotFoundException('Customer role not found. Please run seed script.');
     }
+    roleId = customerRole.id;
 
     const user = await this.prisma.user.create({
       data: {
@@ -38,6 +36,7 @@ export class UserService {
         password: hashedPassword,
         firstName: createUserDto.firstName,
         lastName: createUserDto.lastName,
+        roleName: createUserDto.roleName || 'customer',
         roleId: roleId,
       },
       include: { role: true },

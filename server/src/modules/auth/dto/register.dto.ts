@@ -23,5 +23,11 @@ export class RegisterDto {
 
   @ApiProperty({ example: '9de8c6b4-b1be-43b3-b3f5-e8fed8d0e4e9', description: 'Role ID for admin registration' })
   @IsUUID()
+  @IsOptional()
   roleId: string;
+
+  @ApiPropertyOptional({ example: 'customer', description: 'Role name (optional, defaults to customer)' })
+  @IsString()
+  @IsOptional()
+  roleName?: string;
 }

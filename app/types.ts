@@ -1,7 +1,6 @@
 export enum Role {
-  ADMIN = 'Admin',
-  MANAGER = 'Manager',
-  USER = 'User'
+  ADMIN = 'admin',
+  CUSTOMER = 'customer',
 }
 
 export interface User {
@@ -37,13 +36,13 @@ export interface Order {
   date: string;
 }
 
-export type ViewState = 
-  | 'LOGIN' 
-  | 'REGISTER' 
-  | 'DASHBOARD' 
-  | 'USERS' 
-  | 'ROLES' 
-  | 'PRODUCTS' 
-  | 'SHOP' 
-  | 'CART' 
+export type ViewState =
+  | 'LOGIN'
+  | 'REGISTER'
+  | 'DASHBOARD'
+  | 'USERS'
+  | 'ROLES'
+  | 'PRODUCTS'
+  | 'SHOP'
+  | 'CART'
   | 'ORDERS';

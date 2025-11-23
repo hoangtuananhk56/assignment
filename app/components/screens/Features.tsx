@@ -1,226 +1,326 @@
-import React, { useState } from 'react';
-import { 
-  Plus, Search, MoreHorizontal, Trash2, Edit2, 
-  Filter, ShoppingCart, CreditCard, CheckCircle, 
-  ShieldCheck, Package, Users, ExternalLink, Check, X, UserPlus
+import React, { useState, useEffect } from 'react';
+import {
+    Plus, Search, MoreHorizontal, Trash2, Edit2,
+    Filter, ShoppingCart, CreditCard, CheckCircle,
+    ShieldCheck, Package, Users, ExternalLink, Check, X, UserPlus
 } from 'lucide-react';
 import { Card, Button, Badge, Select, Modal, Input } from '../UI';
 import { Role, Product, CartItem, Order, User } from '../../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
+import userService from '../../api/userService';
 
 // --- USER MANAGEMENT ---
 interface UserManagementProps {
-  users: User[];
-  onAddUser: (user: Omit<User, 'id'>) => void;
-  onUpdateUser: (user: User) => void;
-  onDeleteUser: (id: string) => void;
 }
 
-export const UserManagement: React.FC<UserManagementProps> = ({ users, onAddUser, onUpdateUser, onDeleteUser }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  
-  // Form State
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    role: Role.USER,
-    status: 'Active' as 'Active' | 'Inactive'
-  });
+export const UserManagement: React.FC<UserManagementProps> = () => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [apiUsers, setApiUsers] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string>('');
 
-  const handleOpenAdd = () => {
-    setEditingUser(null);
-    setFormData({
-      firstName: '',
-      lastName: '',
-      email: '',
-      role: Role.USER,
-      status: 'Active'
+    // Form State
+    const [formData, setFormData] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        roleName: Role.CUSTOMER,
+        status: 'Active' as 'Active' | 'Inactive'
     });
-    setIsModalOpen(true);
-  };
 
-  const handleOpenEdit = (user: User) => {
-    setEditingUser(user);
-    setFormData({
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      role: user.role,
-      status: user.status
-    });
-    setIsModalOpen(true);
-  };
+    // Fetch users from API on mount
+    useEffect(() => {
+        fetchUsers();
+    }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (editingUser) {
-      onUpdateUser({
-        ...editingUser,
-        ...formData
-      });
-    } else {
-      onAddUser(formData);
-    }
-    setIsModalOpen(false);
-  };
+    const fetchUsers = async () => {
+        setIsLoading(true);
+        setError('');
+        try {
+            const response = await userService.getAll();
+            console.log('Raw API response:', response); // Debug log
+            console.log('Is array?', Array.isArray(response)); // Check if array
+            console.log('Response type:', typeof response); // Check type
 
-  const filteredUsers = users.filter(u => 
-    u.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+            // Handle different response structures
+            let users = response;
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
-          <p className="text-gray-500">Manage system access and employees.</p>
-        </div>
-        <Button icon={UserPlus} onClick={handleOpenAdd}>Add User</Button>
-      </div>
+            // If response is wrapped in a data property
+            if (response && typeof response === 'object' && 'data' in response && Array.isArray((response as any).data)) {
+                users = (response as any).data;
+            }
 
-      <Card className="overflow-hidden">
-        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-4">
-            <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input 
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500" 
-                  placeholder="Search users..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+            // Ensure users is an array
+            setApiUsers(Array.isArray(users) ? users : []);
+            console.log('Set users:', Array.isArray(users) ? users : []); // Debug what we set
+        } catch (err: any) {
+            setError(err.message);
+            console.error('Failed to fetch users:', err);
+            setApiUsers([]); // Set empty array on error
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleOpenAdd = () => {
+        setEditingUser(null);
+        setFormData({
+            firstName: '',
+            lastName: '',
+            email: '',
+            password: '',
+            roleName: Role.CUSTOMER,
+            status: 'Active'
+        });
+        setIsModalOpen(true);
+    };
+
+    const handleOpenEdit = (user: any) => {
+        setEditingUser(user);
+        setFormData({
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            email: user.email,
+            password: '',
+            roleName: user.roleName === 'admin' ? Role.ADMIN : Role.CUSTOMER,
+            status: 'Active'
+        });
+        setIsModalOpen(true);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError('');
+
+        try {
+            if (editingUser) {
+                // Update user
+                const updateData: any = {
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    email: formData.email,
+                    roleName: formData.roleName,
+                };
+
+                if (formData.password) {
+                    updateData.password = formData.password;
+                }
+
+                await userService.update(editingUser.id, updateData);
+            } else {
+                // Create user
+                await userService.create({
+                    email: formData.email,
+                    password: formData.password,
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    roleName: formData.roleName,
+                });
+            }
+
+            setIsModalOpen(false);
+            fetchUsers(); // Refresh list
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this user?')) return;
+
+        setIsLoading(true);
+        try {
+            await userService.delete(id);
+            fetchUsers(); // Refresh list
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const filteredUsers = apiUsers.filter(u =>
+        (u.firstName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (u.lastName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    console.log(filteredUsers)
+
+    return (
+        <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
+                    <p className="text-gray-500">Manage system access and employees.</p>
+                </div>
+                <Button icon={UserPlus} onClick={handleOpenAdd}>Add User</Button>
             </div>
-            <Button variant="outline" icon={Filter} className="hidden sm:flex">Filter</Button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 text-gray-900 font-semibold border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-4">User</th>
-                <th className="px-6 py-4">Role</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <img src={user.avatar} alt="" className="w-8 h-8 rounded-full bg-gray-200 object-cover" />
-                      <div>
-                        <p className="font-medium text-gray-900">{user.firstName} {user.lastName}</p>
-                        <p className="text-xs text-gray-500">{user.email}</p>
-                      </div>
+
+            {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    {error}
+                </div>
+            )}
+
+            <Card className="overflow-hidden">
+                <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-4">
+                    <div className="relative flex-1 max-w-xs">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500"
+                            placeholder="Search users..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge variant="neutral">{user.role}</Badge>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge variant={user.status === 'Active' ? 'success' : 'warning'}>{user.status}</Badge>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => handleOpenEdit(user)}
-                          className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors"
-                          title="Edit User"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => onDeleteUser(user.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                          title="Delete User"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                    <Button variant="outline" icon={Filter} className="hidden sm:flex">Filter</Button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm text-gray-600">
+                        <thead className="bg-gray-50 text-gray-900 font-semibold border-b border-gray-200">
+                            <tr>
+                                <th className="px-6 py-4">User</th>
+                                <th className="px-6 py-4">Role</th>
+                                <th className="px-6 py-4">Status</th>
+                                <th className="px-6 py-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {isLoading && (
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                                        Loading users...
+                                    </td>
+                                </tr>
+                            )}
+                            {!isLoading && filteredUsers.map((user) => (
+                                <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-semibold">
+                                                {((user.firstName?.[0] || user.email[0]) || 'U').toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-900">{user.firstName || 'N/A'} {user.lastName || ''}</p>
+                                                <p className="text-xs text-gray-500">{user.email}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <Badge variant="neutral">{user.roleName || user.role?.name || 'user'}</Badge>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <Badge variant="success">Active</Badge>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <button
+                                                onClick={() => handleOpenEdit(user)}
+                                                className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors"
+                                                title="Edit User"
+                                                disabled={isLoading}
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(user.id)}
+                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                title="Delete User"
+                                                disabled={isLoading}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                            {filteredUsers.length === 0 && (
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                                        No users found matching your search.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
+
+            {/* User Modal */}
+            <Modal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                title={editingUser ? "Edit User" : "Add New User"}
+            >
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input
+                            label="First Name"
+                            placeholder="Jane"
+                            value={formData.firstName}
+                            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                        />
+                        <Input
+                            label="Last Name"
+                            placeholder="Doe"
+                            value={formData.lastName}
+                            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                        />
                     </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredUsers.length === 0 && (
-                 <tr>
-                   <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                     No users found matching your search.
-                   </td>
-                 </tr>
-              )}
-            </tbody>
-          </table>
+
+                    <Input
+                        label="Email Address"
+                        type="email"
+                        placeholder="jane@example.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        required
+                    />
+
+                    <Input
+                        label={editingUser ? "Password (leave blank to keep current)" : "Password"}
+                        type="password"
+                        placeholder="••••••••"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        required={!editingUser}
+                    />
+
+                    <Select
+                        label="Role"
+                        options={[
+                            { value: 'admin', label: 'Administrator' },
+                            { value: 'customer', label: 'Customer' }
+                        ]}
+                        value={formData.roleName}
+                        onChange={(e) => setFormData({ ...formData, roleName: e.target.value })}
+                    />
+
+                    <div className="pt-4 flex gap-3">
+                        <Button type="button" variant="outline" className="w-full" onClick={() => setIsModalOpen(false)} disabled={isLoading}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" className="w-full" isLoading={isLoading}>
+                            {editingUser ? 'Update User' : 'Create User'}
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
         </div>
-      </Card>
-
-      {/* User Modal */}
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        title={editingUser ? "Edit User" : "Add New User"}
-      >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Input 
-              label="First Name" 
-              placeholder="Jane" 
-              value={formData.firstName}
-              onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-              required
-            />
-            <Input 
-              label="Last Name" 
-              placeholder="Doe" 
-              value={formData.lastName}
-              onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-              required
-            />
-          </div>
-          
-          <Input 
-            label="Email Address" 
-            type="email" 
-            placeholder="jane@example.com" 
-            value={formData.email}
-            onChange={(e) => setFormData({...formData, email: e.target.value})}
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <Select 
-              label="Role"
-              options={[
-                { value: Role.ADMIN, label: 'Administrator' },
-                { value: Role.MANAGER, label: 'Manager' },
-                { value: Role.USER, label: 'Standard User' }
-              ]}
-              value={formData.role}
-              onChange={(e) => setFormData({...formData, role: e.target.value as Role})}
-            />
-            
-            <Select 
-              label="Status"
-              options={[
-                { value: 'Active', label: 'Active' },
-                { value: 'Inactive', label: 'Inactive' }
-              ]}
-              value={formData.status}
-              onChange={(e) => setFormData({...formData, status: e.target.value as 'Active' | 'Inactive'})}
-            />
-          </div>
-
-          <div className="pt-4 flex gap-3">
-            <Button type="button" variant="outline" className="w-full" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button type="submit" className="w-full">{editingUser ? 'Update User' : 'Create User'}</Button>
-          </div>
-        </form>
-      </Modal>
-    </div>
-  );
+    );
 };
 
 // --- ROLE MANAGEMENT ---
@@ -231,10 +331,10 @@ interface RoleManagementProps {
 export const RoleManagement: React.FC<RoleManagementProps> = ({ users }) => {
     // Define all possible permissions in the system
     const allPermissions = [
-        'Read Access', 
-        'Write Access', 
-        'Delete Access', 
-        'Manage Users', 
+        'Read Access',
+        'Write Access',
+        'Delete Access',
+        'Manage Users',
         'Manage Roles',
         'Manage Products',
         'View Analytics',
@@ -245,8 +345,7 @@ export const RoleManagement: React.FC<RoleManagementProps> = ({ users }) => {
     // State for role permissions
     const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({
         [Role.ADMIN]: ['Read Access', 'Write Access', 'Delete Access', 'Manage Users', 'Manage Roles', 'View Analytics', 'Process Orders', 'Access Settings'],
-        [Role.MANAGER]: ['Read Access', 'Write Access', 'Manage Products', 'Process Orders', 'View Analytics'],
-        [Role.USER]: ['Read Access', 'Process Orders']
+        [Role.CUSTOMER]: ['Read Access', 'Write Access', 'Manage Products', 'Process Orders', 'View Analytics'],
     });
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -295,26 +394,25 @@ export const RoleManagement: React.FC<RoleManagementProps> = ({ users }) => {
                 {Object.values(Role).map((role) => (
                     <Card key={role} className="p-6 flex flex-col h-full">
                         <div className="flex justify-between items-start mb-4">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                                role === Role.ADMIN ? 'bg-purple-100 text-purple-600' : 
-                                role === Role.MANAGER ? 'bg-blue-100 text-blue-600' : 
-                                'bg-green-100 text-green-600'
-                            }`}>
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${role === Role.ADMIN ? 'bg-purple-100 text-purple-600' :
+                                role === Role.CUSTOMER ? 'bg-blue-100 text-blue-600' :
+                                    'bg-green-100 text-green-600'
+                                }`}>
                                 <ShieldCheck className="w-6 h-6" />
                             </div>
-                            <button 
+                            <button
                                 onClick={() => handleEditClick(role)}
                                 className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-full transition-colors"
                             >
                                 <Edit2 className="w-4 h-4" />
                             </button>
                         </div>
-                        
+
                         <h3 className="text-lg font-bold text-gray-900 mb-1">{role}</h3>
                         <p className="text-sm text-gray-500 mb-6">
                             {getUserCount(role)} active {getUserCount(role) === 1 ? 'user' : 'users'}
                         </p>
-                        
+
                         <div className="space-y-3 flex-1">
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Capabilities</p>
                             {rolePermissions[role]?.slice(0, 5).map((perm) => (
@@ -334,15 +432,15 @@ export const RoleManagement: React.FC<RoleManagementProps> = ({ users }) => {
             </div>
 
             {/* Edit Role Modal */}
-            <Modal 
-                isOpen={isEditModalOpen} 
-                onClose={() => setIsEditModalOpen(false)} 
+            <Modal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
                 title={`Edit ${editingRole} Permissions`}
             >
                 <div className="space-y-6">
                     <div className="bg-brand-50 p-4 rounded-lg border border-brand-100">
                         <p className="text-sm text-brand-800">
-                            Select the permissions you want to grant to the <strong>{editingRole}</strong> role. 
+                            Select the permissions you want to grant to the <strong>{editingRole}</strong> role.
                             Users assigned this role will immediately inherit these capabilities.
                         </p>
                     </div>
@@ -351,22 +449,20 @@ export const RoleManagement: React.FC<RoleManagementProps> = ({ users }) => {
                         {allPermissions.map((perm) => {
                             const isSelected = tempPermissions.includes(perm);
                             return (
-                                <label 
-                                    key={perm} 
-                                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                                        isSelected 
-                                            ? 'bg-brand-50 border-brand-200 ring-1 ring-brand-200' 
-                                            : 'bg-white border-gray-200 hover:border-gray-300'
-                                    }`}
+                                <label
+                                    key={perm}
+                                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${isSelected
+                                        ? 'bg-brand-50 border-brand-200 ring-1 ring-brand-200'
+                                        : 'bg-white border-gray-200 hover:border-gray-300'
+                                        }`}
                                 >
-                                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
-                                        isSelected ? 'bg-brand-600 border-brand-600' : 'bg-white border-gray-300'
-                                    }`}>
+                                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-brand-600 border-brand-600' : 'bg-white border-gray-300'
+                                        }`}>
                                         {isSelected && <Check className="w-3 h-3 text-white" />}
                                     </div>
-                                    <input 
-                                        type="checkbox" 
-                                        className="hidden" 
+                                    <input
+                                        type="checkbox"
+                                        className="hidden"
                                         checked={isSelected}
                                         onChange={() => handleTogglePermission(perm)}
                                     />
@@ -379,16 +475,16 @@ export const RoleManagement: React.FC<RoleManagementProps> = ({ users }) => {
                     </div>
 
                     <div className="flex gap-3 pt-2">
-                        <Button 
-                            variant="outline" 
-                            className="w-full" 
+                        <Button
+                            variant="outline"
+                            className="w-full"
                             onClick={() => setIsEditModalOpen(false)}
                         >
                             Cancel
                         </Button>
-                        <Button 
-                            variant="primary" 
-                            className="w-full" 
+                        <Button
+                            variant="primary"
+                            className="w-full"
                             onClick={handleSavePermissions}
                         >
                             Save Changes
@@ -402,68 +498,68 @@ export const RoleManagement: React.FC<RoleManagementProps> = ({ users }) => {
 
 // --- SHOP & PRODUCT ---
 export const Shop = ({ products, onAddToCart }: { products: Product[], onAddToCart: (p: Product) => void }) => {
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  
-  const filteredProducts = categoryFilter === 'all' 
-    ? products 
-    : products.filter(p => p.category.toLowerCase() === categoryFilter.toLowerCase());
+    const [categoryFilter, setCategoryFilter] = useState('all');
 
-  return (
-    <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-                <h2 className="text-2xl font-bold text-gray-900">Shop Supplies</h2>
-                <p className="text-gray-500">Order kits and replacements.</p>
-            </div>
-            <div className="flex gap-2">
-                 <Select 
-                    options={[
-                        {value: 'all', label: 'All Categories'}, 
-                        {value: 'dental', label: 'Dental'},
-                        {value: 'cosmetic', label: 'Cosmetic'},
-                        {value: 'accessories', label: 'Accessories'}
-                    ]} 
-                    className="w-40" 
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                 />
-            </div>
-        </div>
+    const filteredProducts = categoryFilter === 'all'
+        ? products
+        : products.filter(p => p.category.toLowerCase() === categoryFilter.toLowerCase());
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map(product => (
-                <Card key={product.id} className="group flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
-                    <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
-                        <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
-                    </div>
-                    <div className="p-4 flex-1 flex flex-col">
-                        <div className="flex justify-between items-start mb-2">
-                            <Badge variant="neutral">{product.category}</Badge>
-                            <span className="font-bold text-gray-900">${product.price}</span>
-                        </div>
-                        <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
-                        <p className="text-sm text-gray-500 mb-4 line-clamp-2">{product.description}</p>
-                        <div className="mt-auto">
-                            <Button onClick={() => onAddToCart(product)} className="w-full" variant="secondary" icon={ShoppingCart}>
-                                Add to Cart
-                            </Button>
-                        </div>
-                    </div>
-                </Card>
-            ))}
-            {filteredProducts.length === 0 && (
-                <div className="col-span-full py-12 text-center">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Package className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900">No products found</h3>
-                    <p className="text-gray-500">Try changing the category filter.</p>
+    return (
+        <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Shop Supplies</h2>
+                    <p className="text-gray-500">Order kits and replacements.</p>
                 </div>
-            )}
+                <div className="flex gap-2">
+                    <Select
+                        options={[
+                            { value: 'all', label: 'All Categories' },
+                            { value: 'dental', label: 'Dental' },
+                            { value: 'cosmetic', label: 'Cosmetic' },
+                            { value: 'accessories', label: 'Accessories' }
+                        ]}
+                        className="w-40"
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredProducts.map(product => (
+                    <Card key={product.id} className="group flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
+                        <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
+                            <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
+                        </div>
+                        <div className="p-4 flex-1 flex flex-col">
+                            <div className="flex justify-between items-start mb-2">
+                                <Badge variant="neutral">{product.category}</Badge>
+                                <span className="font-bold text-gray-900">${product.price}</span>
+                            </div>
+                            <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
+                            <p className="text-sm text-gray-500 mb-4 line-clamp-2">{product.description}</p>
+                            <div className="mt-auto">
+                                <Button onClick={() => onAddToCart(product)} className="w-full" variant="secondary" icon={ShoppingCart}>
+                                    Add to Cart
+                                </Button>
+                            </div>
+                        </div>
+                    </Card>
+                ))}
+                {filteredProducts.length === 0 && (
+                    <div className="col-span-full py-12 text-center">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Package className="w-8 h-8 text-gray-400" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">No products found</h3>
+                        <p className="text-gray-500">Try changing the category filter.</p>
+                    </div>
+                )}
+            </div>
         </div>
-    </div>
-  );
+    );
 };
 
 // --- CART ---
@@ -541,25 +637,25 @@ export const Orders = ({ orders }: { orders: Order[] }) => {
 
     return (
         <div className="space-y-6">
-             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-900">Order History</h2>
                     <p className="text-gray-500">Track your past purchases and status.</p>
                 </div>
             </div>
-            
+
             <Card className="overflow-hidden">
-                 <div className="overflow-x-auto">
+                <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm text-gray-600">
                         <thead className="bg-gray-50 text-gray-900 font-semibold border-b border-gray-200">
-                        <tr>
-                            <th className="px-6 py-4">Order ID</th>
-                            <th className="px-6 py-4">Date</th>
-                            <th className="px-6 py-4">Status</th>
-                            <th className="px-6 py-4">Items</th>
-                            <th className="px-6 py-4">Total</th>
-                            <th className="px-6 py-4 text-right">Action</th>
-                        </tr>
+                            <tr>
+                                <th className="px-6 py-4">Order ID</th>
+                                <th className="px-6 py-4">Date</th>
+                                <th className="px-6 py-4">Status</th>
+                                <th className="px-6 py-4">Items</th>
+                                <th className="px-6 py-4">Total</th>
+                                <th className="px-6 py-4 text-right">Action</th>
+                            </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {orders.map(order => (
@@ -568,9 +664,9 @@ export const Orders = ({ orders }: { orders: Order[] }) => {
                                     <td className="px-6 py-4">{order.date}</td>
                                     <td className="px-6 py-4">
                                         <Badge variant={
-                                            order.status === 'Delivered' ? 'success' : 
-                                            order.status === 'Processing' ? 'warning' : 
-                                            'neutral'
+                                            order.status === 'Delivered' ? 'success' :
+                                                order.status === 'Processing' ? 'warning' :
+                                                    'neutral'
                                         }>
                                             {order.status}
                                         </Badge>
@@ -578,9 +674,9 @@ export const Orders = ({ orders }: { orders: Order[] }) => {
                                     <td className="px-6 py-4">{order.items.length} Items</td>
                                     <td className="px-6 py-4 font-medium">${order.total.toFixed(2)}</td>
                                     <td className="px-6 py-4 text-right">
-                                        <Button 
-                                            variant="ghost" 
-                                            size="sm" 
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
                                             className="text-brand-600 hover:bg-brand-50"
                                             onClick={() => setSelectedOrder(order)}
                                             icon={ExternalLink}
@@ -599,13 +695,13 @@ export const Orders = ({ orders }: { orders: Order[] }) => {
                             )}
                         </tbody>
                     </table>
-                 </div>
+                </div>
             </Card>
 
             {/* Order Details Modal */}
-            <Modal 
-                isOpen={!!selectedOrder} 
-                onClose={() => setSelectedOrder(null)} 
+            <Modal
+                isOpen={!!selectedOrder}
+                onClose={() => setSelectedOrder(null)}
                 title={`Order Details #${selectedOrder?.id}`}
             >
                 {selectedOrder && (
@@ -668,7 +764,7 @@ export const DashboardOverview = () => {
 
     return (
         <div className="space-y-6">
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="p-6 border-l-4 border-l-brand-500">
                     <div className="flex items-center justify-between">
                         <div>
@@ -702,44 +798,44 @@ export const DashboardOverview = () => {
                         </div>
                     </div>
                 </Card>
-             </div>
+            </div>
 
-             <div className="grid lg:grid-cols-2 gap-6">
-                 <Card className="p-6">
-                     <h3 className="text-lg font-bold text-gray-900 mb-6">Weekly Revenue</h3>
-                     <div className="h-[300px] w-full">
-                         <ResponsiveContainer width="100%" height="100%">
-                             <BarChart data={data}>
-                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dy={10} />
-                                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} tickFormatter={(value) => `$${value}`} />
-                                 <Tooltip 
-                                    cursor={{fill: '#f9fafb'}} 
-                                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                                 />
-                                 <Bar dataKey="amt" fill="#EA580C" radius={[4, 4, 0, 0]} barSize={40} />
-                             </BarChart>
-                         </ResponsiveContainer>
-                     </div>
-                 </Card>
+            <div className="grid lg:grid-cols-2 gap-6">
+                <Card className="p-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-6">Weekly Revenue</h3>
+                    <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={data}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(value) => `$${value}`} />
+                                <Tooltip
+                                    cursor={{ fill: '#f9fafb' }}
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                />
+                                <Bar dataKey="amt" fill="#EA580C" radius={[4, 4, 0, 0]} barSize={40} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Card>
 
-                 <Card className="p-6">
-                     <h3 className="text-lg font-bold text-gray-900 mb-6">Order Volume</h3>
-                     <div className="h-[300px] w-full">
-                         <ResponsiveContainer width="100%" height="100%">
-                             <LineChart data={data}>
-                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dy={10} />
-                                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} />
-                                 <Tooltip 
-                                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                                 />
-                                 <Line type="monotone" dataKey="orders" stroke="#1F2937" strokeWidth={3} dot={{r: 4, fill: '#1F2937'}} activeDot={{r: 6}} />
-                             </LineChart>
-                         </ResponsiveContainer>
-                     </div>
-                 </Card>
-             </div>
+                <Card className="p-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-6">Order Volume</h3>
+                    <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={data}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                                <Tooltip
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                />
+                                <Line type="monotone" dataKey="orders" stroke="#1F2937" strokeWidth={3} dot={{ r: 4, fill: '#1F2937' }} activeDot={{ r: 6 }} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Card>
+            </div>
         </div>
     )
 }

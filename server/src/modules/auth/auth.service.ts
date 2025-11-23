@@ -30,9 +30,14 @@ export class AuthService {
       action: p.action,
     })) || [];
 
+    // Remove permissions from role and password from user
+    const { role, ...userDataWithoutRole } = userData;
+    const roleWithoutPermissions = role ? { ...role, permissions: undefined } : undefined;
+
     return {
       user: {
-        ...userData,
+        ...userDataWithoutRole,
+        role: roleWithoutPermissions,
         permissions,
       },
       access_token: token,

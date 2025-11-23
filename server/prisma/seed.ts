@@ -82,11 +82,107 @@ async function main() {
         },
     });
 
-    console.log('✅ Created customer role with permissions');
+    // Create admin user
+    const bcrypt = require('bcrypt');
+    const hashedPassword = await bcrypt.hash('Admin@123', 10);
 
-    console.log('\n📊 Seed Summary:');
-    console.log(`   Admin Role ID: ${adminRole.id}`);
-    console.log(`   Customer Role ID: ${customerRole.id}`);
+    const adminUser = await prisma.user.upsert({
+        where: { email: 'admin@example.com' },
+        update: {},
+        create: {
+            email: 'admin@example.com',
+            password: hashedPassword,
+            firstName: 'Admin',
+            lastName: 'User',
+            roleId: adminRole.id,
+            roleName: 'admin',
+        },
+    });
+
+    console.log('✅ Created admin user');
+
+    // Create sample categories
+    const dentalCategory = await prisma.category.upsert({
+        where: { name: 'Dental' },
+        update: {},
+        create: {
+            name: 'Dental',
+            description: 'Dental products and equipment',
+        },
+    });
+
+    const cosmeticCategory = await prisma.category.upsert({
+        where: { name: 'Cosmetic' },
+        update: {},
+        create: {
+            name: 'Cosmetic',
+            description: 'Cosmetic dentistry products',
+        },
+    });
+
+    const accessoriesCategory = await prisma.category.upsert({
+        where: { name: 'Accessories' },
+        update: {},
+        create: {
+            name: 'Accessories',
+            description: 'Dental accessories and tools',
+        },
+    });
+
+    console.log('✅ Created categories');
+
+    // Create sample products
+    const products = [
+        {
+            name: 'Clear Aligner Kit',
+            description: 'Professional clear aligner kit for orthodontic treatment',
+            price: 299.99,
+            stockQuantity: 50,
+            categoryId: dentalCategory.id,
+        },
+        {
+            name: 'Teeth Whitening System',
+            description: 'Advanced LED teeth whitening system',
+            price: 149.99,
+            stockQuantity: 100,
+            categoryId: cosmeticCategory.id,
+        },
+        {
+            name: 'Digital Impression Scanner',
+            description: 'High-precision digital impression scanner',
+            price: 1299.99,
+            stockQuantity: 10,
+            categoryId: dentalCategory.id,
+        },
+        {
+            name: 'Dental Cleaning Kit',
+            description: 'Complete dental cleaning and maintenance kit',
+            price: 79.99,
+            stockQuantity: 200,
+            categoryId: accessoriesCategory.id,
+        },
+        {
+            name: 'Smile Design Software',
+            description: 'Professional smile design and simulation software',
+            price: 499.99,
+            stockQuantity: 25,
+            categoryId: cosmeticCategory.id,
+        },
+    ];
+
+    for (const productData of products) {
+        const existing = await prisma.product.findFirst({
+            where: { name: productData.name },
+        });
+
+        if (!existing) {
+            await prisma.product.create({
+                data: productData,
+            });
+        }
+    }
+
+    console.log('✅ Created sample products');
     console.log('\n✨ Seeding completed successfully!');
 }
 

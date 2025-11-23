@@ -49,6 +49,7 @@ model User {
   password  String
   firstName String?
   lastName  String?
+  roleName  String?
   roleId    String
   role      Role     @relation(fields: [roleId], references: [id])
   orders    Order[]
