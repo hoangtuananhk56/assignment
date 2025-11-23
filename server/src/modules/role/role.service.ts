@@ -23,16 +23,33 @@ export class RoleService {
         });
     }
 
-    async findAll() {
-        return this.prisma.role.findMany({
-            include: {
-                permissions: true,
-                _count: {
-                    select: { users: true },
+    async findAll(page: number = 1, limit: number = 10) {
+        const skip = (page - 1) * limit;
+
+        const [roles, total] = await Promise.all([
+            this.prisma.role.findMany({
+                include: {
+                    permissions: true,
+                    _count: {
+                        select: { users: true },
+                    },
                 },
+                orderBy: { name: 'asc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.role.count(),
+        ]);
+
+        return {
+            data: roles,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
             },
-            orderBy: { name: 'asc' },
-        });
+        };
     }
 
     async findOne(id: string) {

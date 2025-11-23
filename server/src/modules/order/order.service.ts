@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrderEntity } from './entities/order.entity';
 import { OrderStatus } from '@prisma/client';
@@ -100,44 +101,154 @@ export class OrderService {
     return new OrderEntity(order);
   }
 
-  async findAll(): Promise<OrderEntity[]> {
-    const orders = await this.prisma.order.findMany({
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              include: {
-                category: true,
+  async createDirect(userId: string, createOrderDto: CreateOrderDto): Promise<OrderEntity> {
+    // Validate stock and calculate total
+    let totalPrice = 0;
+    const orderItems: Array<{
+      productId: string;
+      quantity: number;
+      price: number;
+    }> = [];
+
+    for (const item of createOrderDto.items) {
+      const product = await this.prisma.product.findUnique({
+        where: { id: item.productId },
+      });
+
+      if (!product) {
+        throw new BadRequestException(
+          `Product with ID ${item.productId} not found`,
+        );
+      }
+
+      if (product.stockQuantity < item.quantity) {
+        throw new BadRequestException(
+          `Insufficient stock for product ${product.name}. Available: ${product.stockQuantity}`,
+        );
+      }
+
+      const itemPrice = product.price * item.quantity;
+      totalPrice += itemPrice;
+
+      orderItems.push({
+        productId: item.productId,
+        quantity: item.quantity,
+        price: product.price,
+      });
+    }
+
+    // Create order and deduct stock in transaction
+    const order = await this.prisma.$transaction(async (tx) => {
+      const newOrder = await tx.order.create({
+        data: {
+          userId,
+          totalPrice,
+          status: OrderStatus.PENDING,
+          orderItems: {
+            create: orderItems,
+          },
+        },
+        include: {
+          orderItems: {
+            include: {
+              product: {
+                include: {
+                  category: true,
+                },
               },
             },
           },
+          user: true,
         },
-        user: true,
-      },
-      orderBy: { createdAt: 'desc' },
+      });
+
+      // Update product stock
+      for (const item of createOrderDto.items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            stockQuantity: {
+              decrement: item.quantity,
+            },
+          },
+        });
+      }
+
+      return newOrder;
     });
 
-    return orders.map((order) => new OrderEntity(order));
+    return new OrderEntity(order);
   }
 
-  async findByUser(userId: string): Promise<OrderEntity[]> {
-    const orders = await this.prisma.order.findMany({
-      where: { userId },
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              include: {
-                category: true,
+  async findAll(page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        include: {
+          orderItems: {
+            include: {
+              product: {
+                include: {
+                  category: true,
+                },
+              },
+            },
+          },
+          user: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.order.count(),
+    ]);
+
+    return {
+      data: orders.map((order) => new OrderEntity(order)),
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findByUser(userId: string, page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+    const where = { userId };
+
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        include: {
+          orderItems: {
+            include: {
+              product: {
+                include: {
+                  category: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.order.count({ where }),
+    ]);
 
-    return orders.map((order) => new OrderEntity(order));
+    return {
+      data: orders.map((order) => new OrderEntity(order)),
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string): Promise<OrderEntity> {

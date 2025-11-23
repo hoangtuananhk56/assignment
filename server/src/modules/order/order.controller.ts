@@ -8,9 +8,11 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { OrderService } from './order.service';
+import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { CurrentUser, Roles } from '../../common';
 
@@ -29,20 +31,36 @@ export class OrderController {
     return this.orderService.createFromCart(user.id);
   }
 
+  @Post('direct')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create order directly with items in request body' })
+  @ApiResponse({ status: 201, description: 'Order created successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid items or insufficient stock' })
+  createDirect(@CurrentUser() user: any, @Body() createOrderDto: CreateOrderDto) {
+    return this.orderService.createDirect(user.id, createOrderDto);
+  }
+
   @Get()
   @Roles('admin')
   @ApiOperation({ summary: 'Get all orders (Admin only)' })
   @ApiResponse({ status: 200, description: 'Returns all orders' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
-  findAll() {
-    return this.orderService.findAll();
+  findAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.orderService.findAll(page, limit);
   }
 
   @Get('my-orders')
   @ApiOperation({ summary: 'Get current user order history' })
   @ApiResponse({ status: 200, description: 'Returns user order history' })
-  findMyOrders(@CurrentUser() user: any) {
-    return this.orderService.findByUser(user.id);
+  findMyOrders(
+    @CurrentUser() user: any,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.orderService.findByUser(user.id, page, limit);
   }
 
   @Get(':id')

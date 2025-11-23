@@ -8,6 +8,7 @@ import {
     Delete,
     HttpCode,
     HttpStatus,
+    Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { RoleService } from './role.service';
@@ -36,8 +37,11 @@ export class RoleController {
     @Roles('admin')
     @ApiOperation({ summary: 'Get all roles with permissions (Admin only)' })
     @ApiResponse({ status: 200, description: 'Returns all roles' })
-    findAll() {
-        return this.roleService.findAll();
+    findAll(
+        @Query('page') page?: number,
+        @Query('limit') limit?: number,
+    ) {
+        return this.roleService.findAll(page, limit);
     }
 
     @Get(':id')

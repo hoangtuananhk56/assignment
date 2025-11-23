@@ -13,15 +13,32 @@ export class CategoryService {
     });
   }
 
-  async findAll() {
-    return this.prisma.category.findMany({
-      include: {
-        _count: {
-          select: { products: true },
+  async findAll(page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+
+    const [categories, total] = await Promise.all([
+      this.prisma.category.findMany({
+        include: {
+          _count: {
+            select: { products: true },
+          },
         },
+        orderBy: { name: 'asc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.category.count(),
+    ]);
+
+    return {
+      data: categories,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
-      orderBy: { name: 'asc' },
-    });
+    };
   }
 
   async findOne(id: string) {

@@ -5,9 +5,13 @@ import {
     ShieldCheck, Package, Users, ExternalLink, Check, X, UserPlus
 } from 'lucide-react';
 import { Card, Button, Badge, Select, Modal, Input } from '../UI';
+import { Pagination } from '../Pagination';
 import { Role, Product, CartItem, Order, User } from '../../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
 import userService from '../../api/userService';
+import productService from '../../api/productService';
+import categoryService from '../../api/categoryService';
+import orderService from '../../api/orderService';
 
 // --- USER MANAGEMENT ---
 interface UserManagementProps {
@@ -20,6 +24,10 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
     const [apiUsers, setApiUsers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string>('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalUsers, setTotalUsers] = useState(0);
+    const itemsPerPage = 10;
 
     // Form State
     const [formData, setFormData] = useState({
@@ -34,13 +42,13 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
     // Fetch users from API on mount
     useEffect(() => {
         fetchUsers();
-    }, []);
+    }, [currentPage]);
 
     const fetchUsers = async () => {
         setIsLoading(true);
         setError('');
         try {
-            const response = await userService.getAll();
+            const response = await userService.getAll(currentPage, itemsPerPage);
             console.log('Raw API response:', response); // Debug log
             console.log('Is array?', Array.isArray(response)); // Check if array
             console.log('Response type:', typeof response); // Check type
@@ -51,6 +59,11 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
             // If response is wrapped in a data property
             if (response && typeof response === 'object' && 'data' in response && Array.isArray((response as any).data)) {
                 users = (response as any).data;
+                const pagination = (response as any).pagination;
+                if (pagination) {
+                    setTotalPages(pagination.totalPages || 1);
+                    setTotalUsers(pagination.total || 0);
+                }
             }
 
             // Ensure users is an array
@@ -251,6 +264,15 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
                         </tbody>
                     </table>
                 </div>
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={totalUsers}
+                    itemsPerPage={itemsPerPage}
+                    currentItemsCount={apiUsers.length}
+                    onPageChange={setCurrentPage}
+                    isLoading={isLoading}
+                />
             </Card>
 
             {/* User Modal */}
@@ -497,15 +519,67 @@ export const RoleManagement: React.FC<RoleManagementProps> = ({ users }) => {
 }
 
 // --- SHOP & PRODUCT ---
-export const Shop = ({ products, onAddToCart }: { products: Product[], onAddToCart: (p: Product) => void }) => {
+export const Shop = ({ onAddToCart }: { onAddToCart: (p: Product) => void }) => {
     const [categoryFilter, setCategoryFilter] = useState('all');
+    const [products, setProducts] = useState<Product[]>([]);
+    const [categories, setCategories] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    // Fetch products and categories on mount
+    useEffect(() => {
+        fetchProducts();
+        fetchCategories();
+    }, []);
+
+    const fetchProducts = async () => {
+        try {
+            setLoading(true);
+            setError('');
+            const response = await productService.getAll();
+
+            if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
+                setProducts(response.data);
+            } else if (Array.isArray(response)) {
+                setProducts(response);
+            } else {
+                setProducts([]);
+            }
+        } catch (err: any) {
+            console.error('Error fetching products:', err);
+            setError(err.message || 'Failed to load products');
+            setProducts([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchCategories = async () => {
+        try {
+            const response = await categoryService.getAll();
+
+            if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
+                setCategories(response.data);
+            } else if (Array.isArray(response)) {
+                setCategories(response);
+            }
+        } catch (err: any) {
+            console.error('Error fetching categories:', err);
+        }
+    };
 
     const filteredProducts = categoryFilter === 'all'
         ? products
-        : products.filter(p => p.category.toLowerCase() === categoryFilter.toLowerCase());
+        : products.filter(p => p.category?.name?.toLowerCase() === categoryFilter.toLowerCase());
 
     return (
         <div className="space-y-6">
+            {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                    {error}
+                </div>
+            )}
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-900">Shop Supplies</h2>
@@ -515,9 +589,10 @@ export const Shop = ({ products, onAddToCart }: { products: Product[], onAddToCa
                     <Select
                         options={[
                             { value: 'all', label: 'All Categories' },
-                            { value: 'dental', label: 'Dental' },
-                            { value: 'cosmetic', label: 'Cosmetic' },
-                            { value: 'accessories', label: 'Accessories' }
+                            ...categories.map(cat => ({
+                                value: cat.name.toLowerCase(),
+                                label: cat.name
+                            }))
                         ]}
                         className="w-40"
                         value={categoryFilter}
@@ -527,28 +602,11 @@ export const Shop = ({ products, onAddToCart }: { products: Product[], onAddToCa
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredProducts.map(product => (
-                    <Card key={product.id} className="group flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
-                        <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
-                            <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
-                        </div>
-                        <div className="p-4 flex-1 flex flex-col">
-                            <div className="flex justify-between items-start mb-2">
-                                <Badge variant="neutral">{product.category}</Badge>
-                                <span className="font-bold text-gray-900">${product.price}</span>
-                            </div>
-                            <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
-                            <p className="text-sm text-gray-500 mb-4 line-clamp-2">{product.description}</p>
-                            <div className="mt-auto">
-                                <Button onClick={() => onAddToCart(product)} className="w-full" variant="secondary" icon={ShoppingCart}>
-                                    Add to Cart
-                                </Button>
-                            </div>
-                        </div>
-                    </Card>
-                ))}
-                {filteredProducts.length === 0 && (
+                {loading ? (
+                    <div className="col-span-full py-12 text-center text-gray-500">
+                        Loading products...
+                    </div>
+                ) : filteredProducts.length === 0 ? (
                     <div className="col-span-full py-12 text-center">
                         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Package className="w-8 h-8 text-gray-400" />
@@ -556,6 +614,35 @@ export const Shop = ({ products, onAddToCart }: { products: Product[], onAddToCa
                         <h3 className="text-lg font-semibold text-gray-900">No products found</h3>
                         <p className="text-gray-500">Try changing the category filter.</p>
                     </div>
+                ) : (
+                    filteredProducts.map(product => (
+                        <Card key={product.id} className="group flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
+                            <div className="aspect-[4/3] bg-gradient-to-br from-brand-50 to-brand-100 relative overflow-hidden flex items-center justify-center">
+                                <Package className="w-16 h-16 text-brand-400" />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
+                            </div>
+                            <div className="p-4 flex-1 flex flex-col">
+                                <div className="flex justify-between items-start mb-2">
+                                    <Badge variant="neutral">{product.category?.name || 'N/A'}</Badge>
+                                    <span className="font-bold text-gray-900">${product.price.toFixed(2)}</span>
+                                </div>
+                                <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
+                                <p className="text-sm text-gray-500 mb-2 line-clamp-2">{product.description}</p>
+                                <p className="text-xs text-gray-400 mb-4">Stock: {product.stockQuantity}</p>
+                                <div className="mt-auto">
+                                    <Button
+                                        onClick={() => onAddToCart(product)}
+                                        className="w-full"
+                                        variant="secondary"
+                                        icon={ShoppingCart}
+                                        disabled={product.stockQuantity === 0}
+                                    >
+                                        {product.stockQuantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card>
+                    ))
                 )}
             </div>
         </div>
@@ -564,7 +651,36 @@ export const Shop = ({ products, onAddToCart }: { products: Product[], onAddToCa
 
 // --- CART ---
 export const Cart = ({ items, onCheckout, onStartShopping }: { items: CartItem[], onCheckout: () => void, onStartShopping: () => void }) => {
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
     const total = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+
+    const handlePlaceOrder = async () => {
+        try {
+            setLoading(true);
+            setError('');
+
+            // Create order with items from cart
+            const orderData = {
+                items: items.map(item => ({
+                    productId: item.id,
+                    quantity: item.quantity
+                }))
+            };
+
+            console.log('Creating order with data:', orderData);
+            const order = await orderService.create(orderData);
+            console.log('Order created successfully:', order);
+
+            // Call the original onCheckout to clear cart and navigate
+            onCheckout();
+        } catch (err: any) {
+            console.error('Error placing order:', err);
+            setError(err.message || 'Failed to place order');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     if (items.length === 0) {
         return (
@@ -583,12 +699,23 @@ export const Cart = ({ items, onCheckout, onStartShopping }: { items: CartItem[]
         <div className="grid lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-4">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Shopping Cart ({items.length})</h2>
+
+                {error && (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                        {error}
+                    </div>
+                )}
+
                 {items.map(item => (
                     <Card key={item.id} className="p-4 flex items-center gap-4">
-                        <img src={item.image} alt={item.name} className="w-20 h-20 rounded-lg object-cover bg-gray-100" />
+                        <div className="w-20 h-20 rounded-lg bg-brand-50 flex items-center justify-center">
+                            <Package className="w-8 h-8 text-brand-400" />
+                        </div>
                         <div className="flex-1">
                             <h3 className="font-semibold text-gray-900">{item.name}</h3>
-                            <p className="text-sm text-gray-500">{item.category}</p>
+                            <p className="text-sm text-gray-500">
+                                {(item as any).category?.name || (typeof (item as any).category === 'string' ? (item as any).category : 'N/A')}
+                            </p>
                         </div>
                         <div className="flex items-center gap-4">
                             <div className="flex items-center border border-gray-200 rounded-lg">
@@ -622,8 +749,14 @@ export const Cart = ({ items, onCheckout, onStartShopping }: { items: CartItem[]
                         <span>Total</span>
                         <span>${(total * 1.1).toFixed(2)}</span>
                     </div>
-                    <Button onClick={onCheckout} className="w-full py-3" variant="primary" icon={CreditCard}>
-                        Place Order
+                    <Button
+                        onClick={handlePlaceOrder}
+                        className="w-full py-3"
+                        variant="primary"
+                        icon={CreditCard}
+                        disabled={loading}
+                    >
+                        {loading ? 'Placing Order...' : 'Place Order'}
                     </Button>
                 </Card>
             </div>
@@ -750,92 +883,4 @@ export const Orders = ({ orders }: { orders: Order[] }) => {
     )
 }
 
-// --- OVERVIEW CHART WIDGET ---
-export const DashboardOverview = () => {
-    const data = [
-        { name: 'Mon', orders: 40, amt: 2400 },
-        { name: 'Tue', orders: 30, amt: 1398 },
-        { name: 'Wed', orders: 20, amt: 9800 },
-        { name: 'Thu', orders: 27, amt: 3908 },
-        { name: 'Fri', orders: 18, amt: 4800 },
-        { name: 'Sat', orders: 23, amt: 3800 },
-        { name: 'Sun', orders: 34, amt: 4300 },
-    ];
-
-    return (
-        <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="p-6 border-l-4 border-l-brand-500">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-500">Total Revenue</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">$24,500</p>
-                        </div>
-                        <div className="p-3 bg-brand-50 text-brand-600 rounded-lg">
-                            <CreditCard className="w-6 h-6" />
-                        </div>
-                    </div>
-                </Card>
-                <Card className="p-6 border-l-4 border-l-blue-500">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-500">Active Orders</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">12</p>
-                        </div>
-                        <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
-                            <Package className="w-6 h-6" />
-                        </div>
-                    </div>
-                </Card>
-                <Card className="p-6 border-l-4 border-l-green-500">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-500">Total Patients</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">89</p>
-                        </div>
-                        <div className="p-3 bg-green-50 text-green-600 rounded-lg">
-                            <Users className="w-6 h-6" />
-                        </div>
-                    </div>
-                </Card>
-            </div>
-
-            <div className="grid lg:grid-cols-2 gap-6">
-                <Card className="p-6">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Weekly Revenue</h3>
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={data}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(value) => `$${value}`} />
-                                <Tooltip
-                                    cursor={{ fill: '#f9fafb' }}
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                />
-                                <Bar dataKey="amt" fill="#EA580C" radius={[4, 4, 0, 0]} barSize={40} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </Card>
-
-                <Card className="p-6">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Order Volume</h3>
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={data}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                />
-                                <Line type="monotone" dataKey="orders" stroke="#1F2937" strokeWidth={3} dot={{ r: 4, fill: '#1F2937' }} activeDot={{ r: 6 }} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                </Card>
-            </div>
-        </div>
-    )
-}
+// --- OVERVIEW CHART WIDGET (removed) ---

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
 import { Card, Button, Badge, Modal, Input, Select, TextArea } from '../UI';
+import { Pagination } from '../Pagination';
 import productService, { Product } from '../../api/productService';
 import categoryService, { Category } from '../../api/categoryService';
 
@@ -12,6 +13,10 @@ export const ProductManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const itemsPerPage = 10;
   const [newProduct, setNewProduct] = useState({
     name: '',
     price: '',
@@ -20,28 +25,28 @@ export const ProductManagement: React.FC = () => {
     description: ''
   });
 
-  // Fetch products and categories on mount
+  // Fetch products and categories on mount and when page changes
   useEffect(() => {
     fetchProducts();
     fetchCategories();
-  }, []);
+  }, [currentPage]);
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
       setError('');
-      console.log('Fetching products...');
-      const response = await productService.getAll();
-      console.log('Products API response:', response);
+      const response = await productService.getAll(currentPage, itemsPerPage);
 
-      // Handle paginated response {data: [], pagination: {}}
       if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
         setProducts(response.data);
+        const pagination = (response as any).pagination;
+        if (pagination) {
+          setTotalPages(pagination.totalPages || 1);
+          setTotalProducts(pagination.total || 0);
+        }
       } else if (Array.isArray(response)) {
-        // Fallback for non-paginated response
         setProducts(response);
       } else {
-        console.error('Invalid products response:', response);
         setProducts([]);
       }
     } catch (err: any) {
@@ -243,6 +248,15 @@ export const ProductManagement: React.FC = () => {
             )}
           </tbody>
         </table>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalProducts}
+          itemsPerPage={itemsPerPage}
+          currentItemsCount={products.length}
+          onPageChange={setCurrentPage}
+          isLoading={loading}
+        />
       </Card>
 
       <Modal isOpen={isModalOpen} onClose={handleModalClose} title={editingProduct ? 'Edit Product' : 'Add New Product'}>

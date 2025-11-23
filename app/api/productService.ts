@@ -46,9 +46,9 @@ const productService = {
     },
 
     // READ - Get all products
-    getAll: async (): Promise<Product[]> => {
+    getAll: async (page: number = 1, limit: number = 10): Promise<Product[]> => {
         try {
-            const response = await api.get<Product[]>('/products');
+            const response = await api.get<Product[]>(`/products?page=${page}&limit=${limit}`);
             return response;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to fetch products');

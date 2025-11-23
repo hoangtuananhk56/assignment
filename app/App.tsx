@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { AuthScreen } from './components/screens/Auth';
 import { DashboardLayout } from './components/screens/Dashboard';
 import {
-  UserManagement, RoleManagement, Shop, Cart, Orders, DashboardOverview
+  UserManagement, RoleManagement, Shop, Cart, Orders
 } from './components/screens/Features';
 import { ProductManagement } from './components/screens/Features_ProductManagement';
 import { ViewState, CartItem, Product, Order, User } from './types';
 import { MOCK_PRODUCTS, MOCK_ORDERS, MOCK_USERS } from './constants';
 import authService from './api/authService';
+import cartService from './api/cartService';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -26,7 +27,7 @@ const App: React.FC = () => {
       const isAuth = authService.isAuthenticated();
       setIsAuthenticated(isAuth);
       if (isAuth) {
-        setCurrentView('DASHBOARD');
+        setCurrentView('USERS');
       }
       setIsLoading(false);
     };
@@ -36,7 +37,7 @@ const App: React.FC = () => {
 
   const handleLogin = () => {
     setIsAuthenticated(true);
-    setCurrentView('DASHBOARD');
+    setCurrentView('USERS');
   };
 
   const handleLogout = () => {
@@ -65,14 +66,26 @@ const App: React.FC = () => {
   };
 
   // --- Cart & Shop Handlers ---
-  const addToCart = (product: Product) => {
-    setCart(prev => {
-      const existing = prev.find(p => p.id === product.id);
-      if (existing) {
-        return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
-      }
-      return [...prev, { ...product, quantity: 1 }];
-    });
+  const addToCart = async (product: Product) => {
+    try {
+      // Add to database cart
+      await cartService.addItem({
+        productId: product.id,
+        quantity: 1
+      });
+
+      // Update local state for immediate UI feedback
+      setCart(prev => {
+        const existing = prev.find(p => p.id === product.id);
+        if (existing) {
+          return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
+        }
+        return [...prev, { ...product, quantity: 1 }];
+      });
+    } catch (error: any) {
+      console.error('Error adding to cart:', error);
+      alert(error.message || 'Failed to add item to cart');
+    }
   };
 
   const handleAddProduct = (productData: Omit<Product, 'id'>) => {
@@ -84,26 +97,9 @@ const App: React.FC = () => {
   };
 
   const handleCheckout = () => {
-    if (cart.length === 0) return;
-
-    const totalAmount = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0) * 1.1;
-
-    const newOrder: Order = {
-      id: `ORD-${Math.floor(1000 + Math.random() * 9000)}`,
-      userId: '2', // Simulating the current user
-      items: [...cart],
-      total: totalAmount,
-      status: 'Processing',
-      date: new Date().toISOString().split('T')[0]
-    };
-
-    // Add new order to history
-    setOrders([newOrder, ...orders]);
-
-    // Clear cart
+    // Clear local cart state - order creation is handled in Cart component via API
     setCart([]);
-
-    // Navigate to orders page to show success/history
+    // Navigate to orders page
     setCurrentView('ORDERS');
   };
 
@@ -127,7 +123,7 @@ const App: React.FC = () => {
         return <UserManagement />;
       case 'ROLES': return <RoleManagement users={users} />;
       case 'PRODUCTS': return <ProductManagement />;
-      case 'SHOP': return <Shop products={products} onAddToCart={addToCart} />;
+      case 'SHOP': return <Shop onAddToCart={addToCart} />;
       case 'CART':
         return (
           <Cart
@@ -137,7 +133,7 @@ const App: React.FC = () => {
           />
         );
       case 'ORDERS': return <Orders orders={orders} />;
-      default: return <DashboardOverview />;
+      default: return <UserManagement />;
     }
   };
 

@@ -48,9 +48,9 @@ const userService = {
     },
 
     // READ - Get all users (Admin only)
-    getAll: async (): Promise<User[]> => {
+    getAll: async (page: number = 1, limit: number = 10): Promise<User[]> => {
         try {
-            const response = await api.get<User[]>('/users');
+            const response = await api.get<User[]>(`/users?page=${page}&limit=${limit}`);
             return response;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to fetch users');

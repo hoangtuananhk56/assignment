@@ -32,9 +32,9 @@ const categoryService = {
     },
 
     // READ - Get all categories
-    getAll: async (): Promise<Category[]> => {
+    getAll: async (page: number = 1, limit: number = 100): Promise<Category[]> => {
         try {
-            const response = await api.get<Category[]>('/categories');
+            const response = await api.get<Category[]>(`/categories?page=${page}&limit=${limit}`);
             return response;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to fetch categories');

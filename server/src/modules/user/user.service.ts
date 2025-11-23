@@ -45,17 +45,34 @@ export class UserService {
     return new UserEntity(user);
   }
 
-  async findAll(): Promise<UserEntity[]> {
-    const users = await this.prisma.user.findMany({
-      include: {
-        role: {
-          include: {
-            permissions: true,
+  async findAll(page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        include: {
+          role: {
+            include: {
+              permissions: true,
+            },
           },
         },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count(),
+    ]);
+
+    return {
+      data: users.map((user) => new UserEntity(user)),
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
-    });
-    return users.map((user) => new UserEntity(user));
+    };
   }
 
   async findOne(id: string): Promise<UserEntity> {
