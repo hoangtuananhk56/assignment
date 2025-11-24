@@ -45,7 +45,7 @@ This is a modern e-commerce platform with:
 ## Setup Instructions
 
 ### Prerequisites
-- Node.js (v18 or higher)
+- Node.js (v20 or higher)
 - PostgreSQL (v14 or higher)
 - npm or yarn
 
@@ -64,8 +64,8 @@ This is a modern e-commerce platform with:
 3. **Configure environment variables:**
    Create a `.env` file in the server directory (use `env.example` as template):
    ```env
-   DATABASE_URL="postgresql://admin:password@localhost:5432/ecommerce?schema=public"
-   JWT_SECRET="your-secret-key-here"
+   DATABASE_URL="postgresql://admin:admin123@localhost:5432/ecommerce_db?schema=public"
+   JWT_SECRET="your-super-secret-jwt-key-change-this-in-production"
    JWT_EXPIRES_IN="7d"
    PORT=3000
    ```
@@ -188,8 +188,8 @@ After running `docker-compose up -d`:
 - Database: localhost:5432
 
 Login with seeded credentials:
-- Admin: admin@example.com / Admin123!
-- Customer: customer@example.com / Customer123!
+- Admin: admin@example.com / Admin@123
+- Customer: customer@example.com / Customer@123
 
 #### Rebuild Containers
 
@@ -225,18 +225,16 @@ The seed script creates:
    - Granular permissions for RBAC system
 
 3. **Sample Users:**
-   - Admin : `admin@example.com` / `Admin@123!`
-   - Customer: `customer@example.com` / `Customer123!`
+   - Admin : `admin@example.com` / `Admin@123`
+   - Customer: `customer@example.com` / `Customer@123`
 
 4. **Categories:**
-   - Electronics
-   - Clothing
-   - Home & Garden
-   - Books
-   - Sports & Outdoors
+   - Dental
+   - Cosmetic
+   - Accessories
 
 5. **Sample Products:**
-   - Multiple products in each category
+   - 10 dental and cosmetic products
    - Realistic prices and stock quantities
    - Product descriptions
 
@@ -261,8 +259,8 @@ After seeding, you can login with these accounts:
 
 | Role     | Email                    | Password      |
 |----------|--------------------------|---------------|
-| Admin    | admin@example.com        | Admin123!     |
-| Customer | customer@example.com     | Customer123!  |
+| Admin    | admin@example.com        | Admin@123     |
+| Customer | customer@example.com     | Customer@123  |
 
 ## Running Tests
 
