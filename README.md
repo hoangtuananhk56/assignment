@@ -64,7 +64,7 @@ This is a modern e-commerce platform with:
 3. **Configure environment variables:**
    Create a `.env` file in the server directory (use `env.example` as template):
    ```env
-   DATABASE_URL="postgresql://user:password@localhost:5432/ecommerce?schema=public"
+   DATABASE_URL="postgresql://admin:password@localhost:5432/ecommerce?schema=public"
    JWT_SECRET="your-secret-key-here"
    JWT_EXPIRES_IN="7d"
    PORT=3000
@@ -225,8 +225,8 @@ The seed script creates:
    - Granular permissions for RBAC system
 
 3. **Sample Users:**
-   - Admin user: `admin@example.com` / `Admin123!`
-   - Customer user: `customer@example.com` / `Customer123!`
+   - Admin : `admin@example.com` / `Admin@123!`
+   - Customer: `customer@example.com` / `Customer123!`
 
 4. **Categories:**
    - Electronics
@@ -422,20 +422,21 @@ POST /auth/register
 Content-Type: application/json
 
 {
-  "email": "user@example.com",
-  "password": "Password123!",
+  "email": "admin@example.com",
+  "password": "Admin@123!",
   "name": "John Doe",
   "roleId": "role-id-here"
 }
 
 Response (201):
 {
-  "id": "user-id",
-  "email": "user@example.com",
+  "id": "admin-id",
+  "email": "admin@example.com",
   "name": "John Doe",
+  "roleName": "admin",
   "role": {
     "id": "role-id",
-    "name": "customer"
+    "name": "admin"
   }
 }
 ```
@@ -446,17 +447,18 @@ POST /auth/login
 Content-Type: application/json
 
 {
-  "email": "user@example.com",
-  "password": "Password123!"
+  "email": "admin@example.com",
+  "password": "Admin@123!"
 }
 
 Response (200):
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "user-id",
-    "email": "user@example.com",
+  "admin": {
+    "id": "admin-id",
+    "email": "admin@example.com",
     "name": "John Doe",
+    "roleName":"admin",
     "role": {
       "id": "role-id",
       "name": "customer",
@@ -629,7 +631,7 @@ Authorization: Bearer {token}
 Response (200):
 {
   "id": "cart-id",
-  "userId": "user-id",
+  "userId": "admin-id",
   "items": [
     {
       "id": "cart-item-id",
@@ -722,7 +724,7 @@ Authorization: Bearer {token}
 Response (201):
 {
   "id": "order-id",
-  "userId": "user-id",
+  "userId": "admin-id",
   "totalPrice": 2599.98,
   "status": "PENDING",
   "orderItems": [
@@ -823,7 +825,7 @@ Response (200):
   "data": [
     {
       "id": "user-id",
-      "email": "user@example.com",
+      "email": "customer@example.com",
       "name": "John Doe",
       "role": {
         "name": "customer"
@@ -846,8 +848,8 @@ Authorization: Bearer {token}
 
 Response (200):
 {
-  "id": "user-id",
-  "email": "user@example.com",
+  "id": "admin-id",
+  "email": "admin@example.com",
   "name": "John Doe",
   "role": {
     "id": "role-id",
@@ -870,7 +872,7 @@ Content-Type: application/json
 
 Response (200):
 {
-  "id": "user-id",
+  "id": "admin-id",
   "name": "Jane Doe",
   "email": "jane@example.com",
   ...
