@@ -412,7 +412,7 @@ CANCELLED (only from PENDING or PROCESSING)
 
 ## API Documentation
 
-Base URL: `http://localhost:3000/api/v1`
+Base URL: `http://localhost:3000/api/v1/docs`
 
 ### Authentication
 
