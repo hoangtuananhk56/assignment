@@ -2,8 +2,7 @@ import { Product, Role, User, Order } from './types';
 
 export const MOCK_USERS: User[] = [
   { id: '1', firstName: 'Sarah', lastName: 'Connor', email: 'sarah@example.com', role: Role.ADMIN, status: 'Active', avatar: 'https://picsum.photos/100/100?random=1' },
-  { id: '2', firstName: 'John', lastName: 'Doe', email: 'john@example.com', role: Role.USER, status: 'Active', avatar: 'https://picsum.photos/100/100?random=2' },
-  { id: '3', firstName: 'Jane', lastName: 'Smith', email: 'jane@example.com', role: Role.MANAGER, status: 'Inactive', avatar: 'https://picsum.photos/100/100?random=3' },
+  { id: '2', firstName: 'John', lastName: 'Doe', email: 'john@example.com', role: Role.CUSTOMER, status: 'Active', avatar: 'https://picsum.photos/100/100?random=2' },
 ];
 
 export const MOCK_PRODUCTS: Product[] = [

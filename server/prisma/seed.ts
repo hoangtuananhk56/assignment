@@ -101,6 +101,21 @@ async function main() {
 
     console.log('✅ Created admin user');
 
+    // Create customer user
+    const hashedCustomerPassword = await bcrypt.hash('Customer@123', 10);
+    const customerUser = await prisma.user.upsert({
+        where: { email: 'customer@example.com' },
+        update: {},
+        create: {
+            email: 'customer@example.com',
+            password: hashedCustomerPassword,
+            firstName: 'Customer',
+            lastName: 'User',
+            roleId: customerRole.id,
+            roleName: 'customer',
+        },
+    });
+
     // Create sample categories
     const dentalCategory = await prisma.category.upsert({
         where: { name: 'Dental' },
@@ -166,6 +181,41 @@ async function main() {
             description: 'Professional smile design and simulation software',
             price: 499.99,
             stockQuantity: 25,
+            categoryId: cosmeticCategory.id,
+        },
+        {
+            name: 'Orthodontic Brackets Set',
+            description: 'Premium stainless steel orthodontic brackets',
+            price: 189.99,
+            stockQuantity: 75,
+            categoryId: dentalCategory.id,
+        },
+        {
+            name: 'Teeth Veneer Kit',
+            description: 'Complete teeth veneer application kit',
+            price: 599.99,
+            stockQuantity: 30,
+            categoryId: cosmeticCategory.id,
+        },
+        {
+            name: 'Electric Toothbrush Pro',
+            description: 'Professional electric toothbrush with smart timer',
+            price: 129.99,
+            stockQuantity: 150,
+            categoryId: accessoriesCategory.id,
+        },
+        {
+            name: 'Dental Microscope',
+            description: 'High-resolution dental surgical microscope',
+            price: 2499.99,
+            stockQuantity: 5,
+            categoryId: dentalCategory.id,
+        },
+        {
+            name: 'Gum Contouring Laser',
+            description: 'Precision laser for cosmetic gum contouring',
+            price: 3999.99,
+            stockQuantity: 3,
             categoryId: cosmeticCategory.id,
         },
     ];

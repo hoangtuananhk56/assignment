@@ -16,24 +16,21 @@ export interface RegisterRequest {
 }
 
 export interface AuthResponse {
-    data: {
-        access_token: string;
-        user: {
+    access_token: string;
+    user: {
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+        roleName: string;
+        role?: {
             id: string;
-            email: string;
-            firstName: string;
-            lastName: string;
-            roleName: string;
-            role?: {
-                id: string;
-                name: string;
-            };
-            permissions?: Array<{
-                resource: string;
-                action: string;
-            }>;
-        }
-        statusCode: number
+            name: string;
+        };
+        permissions?: Array<{
+            resource: string;
+            action: string;
+        }>;
     };
 }
 
@@ -73,9 +70,10 @@ const authService = {
             console.log('Login response:', response); // Debug log
 
             // Store tokens and user data
-            if (response.data.access_token) {
-                localStorage.setItem('access_token', response.data.access_token);
-                localStorage.setItem('user', JSON.stringify(response.data.user));
+            // Response is already unwrapped by axios interceptor
+            if (response.access_token) {
+                localStorage.setItem('access_token', response.access_token);
+                localStorage.setItem('user', JSON.stringify(response.user));
             }
 
             return response;
@@ -92,9 +90,10 @@ const authService = {
             console.log('Register response:', response); // Debug log
 
             // Store tokens and user data
-            if (response.data.access_token) {
-                localStorage.setItem('access_token', response.data.access_token);
-                localStorage.setItem('user', JSON.stringify(response.data.user));
+            // Response is already unwrapped by axios interceptor
+            if (response.access_token) {
+                localStorage.setItem('access_token', response.access_token);
+                localStorage.setItem('user', JSON.stringify(response.user));
             }
 
             return response;

@@ -67,14 +67,14 @@ export const DashboardLayout: React.FC<DashboardProps> = ({ currentView, onNavig
           </div>
 
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-            {/* {JSON.parse(user || '{}').roleName === 'admin' && ( */}
-            <>
-              <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-6">Management</p>
-              <NavItem view="USERS" icon={Users} label="Users" />
-              <NavItem view="ROLES" icon={ShieldCheck} label="Roles & Permissions" />
-              <NavItem view="PRODUCTS" icon={Package} label="Products" />
-            </>
-            {/* )} */}
+            {JSON.parse(user || '{}').roleName === 'admin' && (
+              <>
+                <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-6">Management</p>
+                <NavItem view="USERS" icon={Users} label="Users" />
+                <NavItem view="ROLES" icon={ShieldCheck} label="Roles & Permissions" />
+                <NavItem view="PRODUCTS" icon={Package} label="Products" />
+              </>
+            )}
 
             <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-6">Commerce</p>
             <NavItem view="SHOP" icon={ShoppingBag} label="Shop" />

@@ -27,7 +27,8 @@ const App: React.FC = () => {
       const isAuth = authService.isAuthenticated();
       setIsAuthenticated(isAuth);
       if (isAuth) {
-        setCurrentView('USERS');
+        const user = authService.getCurrentUser();
+        setCurrentView(user?.roleName === 'admin' ? 'USERS' : 'SHOP');
       }
       setIsLoading(false);
     };
